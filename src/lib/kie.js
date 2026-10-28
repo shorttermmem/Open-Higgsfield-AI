@@ -389,7 +389,8 @@ export class KieClient {
         const bridge = cfPath();
         if (bridge) return bridge.uploadFile(file);
         const key = this.getKey();
-        const url = `${this.baseUrl}/api/v1/file-stream-upload`;
+        // Uploads live on Kie's storage host, not the task API (/api/v1/... 404s).
+        const url = 'https://kieai.redpandaai.co/api/file-stream-upload';
 
         const formData = new FormData();
         formData.append('file', file);

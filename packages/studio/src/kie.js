@@ -1,37 +1,66 @@
-const BASE_URL = 'https://api.kie.ai';
+import { findModelById } from './models.js';
+
+// Requests go through our own origin (app/api/kie/*), which forwards to Kie and
+// can supply the key from `.env.local`. File uploads live on a different host
+// than the task API, so they get their own proxy.
+const BASE_URL = '/api/kie';
+const UPLOAD_BASE_URL = '/api/kie-upload';
+
+// Sentinel used when the app is running on the server-side `.env.local` key.
+export const SERVER_KEY = '__server__';
+
+function usingServerKey(apiKey) {
+    return !apiKey || apiKey === SERVER_KEY;
+}
 
 async function getHeaders(apiKey) {
-    return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-    };
+    const headers = { 'Content-Type': 'application/json' };
+    if (!usingServerKey(apiKey)) headers['x-kie-key'] = apiKey;
+    return headers;
 }
 
 async function pollJobs(taskId, apiKey, maxAttempts = 900, interval = 2000) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         await new Promise(resolve => setTimeout(resolve, interval));
+
+        let response;
         try {
-            const response = await fetch(`${BASE_URL}/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`, {
+            response = await fetch(`${BASE_URL}/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`, {
                 headers: await getHeaders(apiKey)
             });
-            if (!response.ok) {
-                const errText = await response.text();
-                if (response.status >= 500) continue;
-                throw new Error(`Poll Failed: ${response.status} - ${errText.slice(0, 200)}`);
+        } catch (error) {
+            // Network hiccup: retry, but don't hide it forever.
+            if (attempt === maxAttempts) throw error;
+            continue;
+        }
+
+        if (!response.ok) {
+            const errText = await response.text();
+            // 5xx/429 are transient; everything else (401, 402, 404, 422)
+            // must surface immediately instead of looking like a hang.
+            if (response.status >= 500 || response.status === 429) {
+                if (attempt === maxAttempts) {
+                    throw new Error(`Poll Failed: ${response.status} - ${errText.slice(0, 200)}`);
+                }
+                continue;
             }
-            const json = await response.json();
-            if (json.code && json.code !== 200) {
+            throw new Error(`Poll Failed: ${response.status} - ${errText.slice(0, 200)}`);
+        }
+
+        const json = await response.json();
+        if (json.code && json.code !== 200) {
+            if (json.code === 429 || json.code >= 500) {
                 if (attempt === maxAttempts) throw new Error(`KIE Poll Error ${json.code}: ${json.msg}`);
                 continue;
             }
-            const data = json.data || {};
-            const state = (data.state || '').toLowerCase();
-            if (state === 'success') return data;
-            if (state === 'fail' || state === 'error') {
-                throw new Error(`Generation failed: ${data.failMsg || 'Unknown error'}`);
-            }
-        } catch (error) {
-            if (attempt === maxAttempts) throw error;
+            throw new Error(`KIE Poll Error ${json.code}: ${json.msg || 'Unknown error'}`);
+        }
+
+        const data = json.data || {};
+        const state = (data.state || '').toLowerCase();
+        if (state === 'success') return data;
+        if (state === 'fail' || state === 'error') {
+            throw new Error(`Generation failed: ${data.failMsg || 'Unknown error'}`);
         }
     }
     throw new Error('Generation timed out after polling.');
@@ -59,121 +88,88 @@ async function submitTask(apiKey, slug, input, onRequestId, maxAttempts = 60) {
     }
     const taskId = json.data?.taskId;
     if (!taskId) return json;
+    console.log('[Kie] task created', { model: slug, taskId });
     if (onRequestId) onRequestId(taskId);
     const result = await pollJobs(taskId, apiKey, maxAttempts);
     const outputUrl = extractResultUrl(result) || result.url;
     return { ...result, url: outputUrl };
 }
 
-function imageSlug(params) {
-    const id = params.model || '';
-    if (id.includes('nano-banana-pro')) return 'nano-banana-pro';
-    if (id.includes('nano-banana-2')) return 'nano-banana-2';
-    if (id.includes('nano-banana')) return 'nano-banana';
-    if (id.includes('grok')) return 'grok-imagine/text-to-image';
-    return 'nano-banana-2';
+// Every selectable model carries the exact Kie slug that will be submitted.
+// Resolving from the registry (instead of guessing from the id) keeps the
+// picker label and the model that actually runs in sync.
+function requireModel(params) {
+    const model = findModelById(params.model);
+    if (!model?.slug) {
+        throw new Error(`Unsupported model: ${params.model || '(none)'}`);
+    }
+    return model;
 }
 
-function editSlug(params) {
-    const id = params.model || '';
-    if (id.includes('qwen')) return 'qwen/image-to-image';
-    if (id.includes('gpt')) return 'gpt-image-2-image-to-image';
-    if (id.includes('nano-banana-pro')) return 'nano-banana-pro';
-    if (id.includes('nano-banana-2')) return 'nano-banana-2';
-    if (id.includes('nano-banana')) return 'nano-banana-edit';
-    return 'nano-banana-edit';
-}
+function buildInput(model, params) {
+    const input = { ...(model.defaults || {}) };
+    const set = (field, value) => {
+        if (field && value !== undefined && value !== null && value !== '') input[field] = value;
+    };
 
-function imageInput(params, edit) {
-    const input = { output_format: 'jpg' };
-    if (params.prompt) input.prompt = params.prompt;
-    if (params.aspect_ratio) input.aspect_ratio = params.aspect_ratio;
-    if (params.resolution) input.resolution = String(params.resolution).toUpperCase().replace('K', 'K');
-    if (params.seed !== undefined && params.seed !== -1) input.seed = params.seed;
+    if (model.inputs?.prompt) set('prompt', params.prompt);
+    if (model.inputs?.aspect_ratio) set('aspect_ratio', params.aspect_ratio);
+    if (model.inputs?.duration) set('duration', params.duration);
+    if (model.inputs?.mode) set('mode', params.mode);
+    if (model.inputs?.quality) set('quality', params.quality);
 
-    const images = params.images_list?.length > 0 ? params.images_list : (params.image_url ? [params.image_url] : null);
-    if (images) {
-        if (edit) {
-            const id = params.model || '';
-            if (id.includes('qwen')) input.image_url = images[0];
-            else if (id.includes('gpt')) input.input_urls = images;
-            else input.image_input = images;
+    if (model.inputs?.resolution) {
+        const value = params.resolution ?? params.quality;
+        if (model.slug === 'omnihuman-1-5') {
+            set('output_resolution', value === undefined ? undefined : String(value).replace(/p$/i, ''));
         } else {
-            input.image_input = images;
+            set(model.resolutionField || 'resolution', value);
         }
     }
-    return input;
-}
 
-function videoSlug(params, kind, hasImage) {
-    const id = params.model || '';
-    if (id.includes('veo')) {
-        let model = 'veo3';
-        if (id.includes('fast')) model = 'veo3_fast';
-        else if (id.includes('lite')) model = 'veo3_lite';
-        return { family: 'veo', model, generationType: hasImage ? 'FIRST_AND_LAST_FRAMES_2_VIDEO' : 'TEXT_2_VIDEO' };
+    const images = params.images_list?.length
+        ? params.images_list
+        : (params.image_url ? [params.image_url] : []);
+    if (images.length && model.imageField) {
+        input[model.imageField] = model.imageFieldType === 'array' ? images : images[0];
     }
-    if (id.includes('kling')) {
-        if (id.includes('2.1-standard')) return { family: 'jobs', model: 'kling/v2-1-standard' };
-        return { family: 'jobs', model: 'kling/v2-1-pro', klingI2v: true };
+    if (params.video_url && model.videoField) {
+        input[model.videoField] = model.videoFieldType === 'array' ? [params.video_url] : params.video_url;
     }
-    if (id.includes('seedance')) {
-        if (id.includes('v1.5')) return { family: 'jobs', model: 'bytedance/seedance-1.5-pro' };
-        if (id.includes('lite')) return { family: 'jobs', model: 'bytedance/seedance-2-fast' };
-        return { family: 'jobs', model: 'bytedance/seedance-2' };
+    if (params.audio_url && model.audioField) {
+        input[model.audioField] = model.audioFieldType === 'array' ? [params.audio_url] : params.audio_url;
     }
-    if (id.includes('wan')) {
-        return { family: 'jobs', model: 'wan/3-0-video', videoInput: 'first_frame' };
-    }
-    if (id.includes('sora') || id.includes('ovi')) {
-        if (hasImage) return { family: 'jobs', model: id.includes('pro') ? 'sora-2-pro-image-to-video' : 'sora-2-image-to-video' };
-        return { family: 'jobs', model: id.includes('pro') ? 'sora-2-pro-text-to-video' : 'sora-2-text-to-video' };
-    }
-    if (kind === 'i2v') return { family: 'jobs', model: 'sora-2-image-to-video' };
-    return { family: 'jobs', model: 'sora-2-text-to-video' };
-}
+    if (params.seed !== undefined && model.hasSeed) set('seed', params.seed);
 
-function videoInput(params, settings) {
-    const input = {};
-    if (params.prompt) input.prompt = params.prompt;
-    if (params.aspect_ratio) input.aspect_ratio = params.aspect_ratio;
-    if (params.duration) input.duration = params.duration;
-    if (params.resolution) input.resolution = params.resolution;
-    if (params.image_url) {
-        if (settings.videoInput === 'first_frame') {
-            input.first_frame_url = params.image_url;
-            if (input.resolution) input.resolution = String(input.resolution).toUpperCase();
-        } else {
-            input.image_urls = [params.image_url];
-        }
-    }
     return input;
 }
 
 export async function generateImage(apiKey, params) {
-    const slug = imageSlug(params);
-    const input = imageInput(params, false);
-    return submitTask(apiKey, slug, input, params.onRequestId, 60);
+    const model = requireModel(params);
+    return submitTask(apiKey, model.slug, buildInput(model, params), params.onRequestId, 60);
 }
 
 export async function generateI2I(apiKey, params) {
-    const slug = editSlug(params);
-    const input = imageInput(params, true);
-    return submitTask(apiKey, slug, input, params.onRequestId, 60);
+    const model = requireModel(params);
+    return submitTask(apiKey, model.slug, buildInput(model, params), params.onRequestId, 60);
 }
 
+const VEO_LEGACY_SLUGS = new Set(['veo3', 'veo3_fast']);
+
 export async function generateVideo(apiKey, params) {
-    const settings = videoSlug(params, 't2v', !!params.image_url);
-    if (settings.family === 'veo') return generateVeo(apiKey, params, settings);
-    const input = videoInput(params, settings);
-    return submitTask(apiKey, settings.model, input, params.onRequestId, 900);
+    const model = requireModel(params);
+    if (VEO_LEGACY_SLUGS.has(model.slug)) {
+        return generateVeo(apiKey, params, { family: 'veo', model: model.slug });
+    }
+    return submitTask(apiKey, model.slug, buildInput(model, params), params.onRequestId, 900);
 }
 
 export async function generateI2V(apiKey, params) {
-    const settings = videoSlug(params, 'i2v', !!params.image_url);
-    if (settings.family === 'veo') return generateVeo(apiKey, params, settings);
-    const input = videoInput(params, settings);
-    return submitTask(apiKey, settings.model, input, params.onRequestId, 900);
+    const model = requireModel(params);
+    if (VEO_LEGACY_SLUGS.has(model.slug)) {
+        return generateVeo(apiKey, params, { family: 'veo', model: model.slug });
+    }
+    return submitTask(apiKey, model.slug, buildInput(model, params), params.onRequestId, 900);
 }
 
 async function generateVeo(apiKey, params, settings) {
@@ -227,35 +223,28 @@ async function generateVeo(apiKey, params, settings) {
 }
 
 export async function processLipSync(apiKey, params) {
-    let slug;
-    let input = {};
-
-    if (params.video_url && params.audio_url) {
-        slug = 'volcengine/video-to-video-lip-sync';
-        input = {
-            mode: 'basic',
-            video_url: params.video_url,
-            audio_url: params.audio_url
-        };
-    } else if (params.image_url && params.audio_url) {
-        slug = 'omnihuman-1-5';
-        input = {
-            image_url: params.image_url,
-            audio_url: params.audio_url,
-            output_resolution: '1080'
-        };
-        if (params.prompt) input.prompt = params.prompt;
-        if (params.seed !== undefined && params.seed !== -1) input.seed = params.seed;
-    } else {
-        throw new Error('LipSync requires both a source (image or video) and an audio file.');
+    const model = requireModel(params);
+    if (!params.audio_url) {
+        throw new Error('LipSync requires an audio file.');
     }
-
-    return submitTask(apiKey, slug, input, params.onRequestId, 900);
+    if (!params.image_url && !params.video_url) {
+        throw new Error('LipSync requires a source image or video.');
+    }
+    // Some talking-avatar models require a prompt. OmniHuman's prompt is
+    // optional and also steers body/hand motion, so don't invent one there.
+    const input = buildInput(model, {
+        ...params,
+        prompt: params.prompt || (model.requiresPrompt ? 'The person is talking naturally.' : undefined),
+    });
+    return submitTask(apiKey, model.slug, input, params.onRequestId, 900);
 }
 
 export function uploadFile(apiKey, file, onProgress) {
     return new Promise((resolve, reject) => {
-        const url = `${BASE_URL}/api/v1/file-stream-upload`;
+        // Kie moved file uploads off api.kie.ai onto its storage host; the
+        // /api/v1/... path now returns 404. Response shape is
+        // { success, code, msg, data: { downloadUrl, filePath, ... } }.
+        const url = `${UPLOAD_BASE_URL}/api/file-stream-upload`;
         const formData = new FormData();
         formData.append('file', file);
         formData.append('uploadPath', 'open-higgsfield');
@@ -263,7 +252,7 @@ export function uploadFile(apiKey, file, onProgress) {
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', url);
-        xhr.setRequestHeader('Authorization', `Bearer ${apiKey}`);
+        if (!usingServerKey(apiKey)) xhr.setRequestHeader('x-kie-key', apiKey);
 
         if (onProgress) {
             xhr.upload.onprogress = (event) => {
@@ -282,7 +271,7 @@ export function uploadFile(apiKey, file, onProgress) {
                         reject(new Error(`File upload failed: ${json.code} ${json.msg}`));
                         return;
                     }
-                    const fileUrl = json.data?.fileUrl || json.data?.downloadUrl || json.data?.url || json.url;
+                    const fileUrl = json.data?.downloadUrl || json.data?.fileUrl || json.data?.url || json.url;
                     if (!fileUrl) {
                         reject(new Error('No URL returned from file upload'));
                     } else {

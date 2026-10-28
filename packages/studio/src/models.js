@@ -1,7 +1,10 @@
 // Auto-generated from models_dump.json
+import { kieT2I, kieI2I, kieT2V, kieI2V, kieV2V, kieLipSync } from './kieCatalog.js';
+
 export const t2iModels = [
   {
     "id": "nano-banana",
+    "slug": "nano-banana",
     "name": "Nano Banana",
     "endpoint": "nano-banana",
     "inputs": {
@@ -1416,7 +1419,8 @@ export const t2iModels = [
   },
   {
     "id": "grok-imagine-text-to-image",
-    "name": "Grok Imagine Text To Image",
+    "slug": "grok-imagine/text-to-image",
+    "name": "Grok Imagine",
     "inputs": {
       "prompt": {
         "examples": [
@@ -1445,6 +1449,7 @@ export const t2iModels = [
   },
   {
     "id": "nano-banana-pro",
+    "slug": "nano-banana-pro",
     "name": "Nano Banana Pro",
     "endpoint": "nano-banana-pro",
     "inputs": {
@@ -2008,6 +2013,7 @@ export const t2iModels = [
   },
   {
     "id": "nano-banana-2",
+    "slug": "nano-banana-2",
     "name": "Nano Banana 2",
     "endpoint": "nano-banana-2",
     "family": "nano",
@@ -2112,7 +2118,8 @@ export const getAspectRatiosForModel = (modelId) => {
 export const t2vModels = [
   {
     "id": "seedance-lite-t2v",
-    "name": "Seedance Lite",
+    "slug": "bytedance/seedance-2-fast",
+    "name": "Seedance 2 Fast",
     "inputs": {
       "prompt": { "type": "string", "title": "Prompt", "name": "prompt", "description": "The prompt to generate the video" },
       "aspect_ratio": { "enum": ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "9:21"], "title": "Aspect Ratio", "name": "aspect_ratio", "type": "string", "description": "Aspect ratio of the output video.", "default": "16:9" },
@@ -2142,6 +2149,7 @@ export const t2vModels = [
   },
   {
     "id": "seedance-v1.5-pro-t2v",
+    "slug": "bytedance/seedance-1.5-pro",
     "name": "Seedance v1.5 Pro",
     "inputs": {
       "prompt": { "type": "string", "title": "Prompt", "name": "prompt", "description": "Text prompt describing the video." },
@@ -2162,6 +2170,7 @@ export const t2vModels = [
   },
   {
     "id": "seedance-v2.0-t2v",
+    "slug": "bytedance/seedance-2",
     "name": "Seedance 2.0",
     "inputs": {
       "prompt": { "type": "string", "title": "Prompt", "name": "prompt", "description": "The prompt to generate the video" },
@@ -2172,6 +2181,8 @@ export const t2vModels = [
   },
   {
     "id": "seedance-v2.0-extend",
+    "slug": "bytedance/seedance-2",
+    "hidden": true,
     "name": "Seedance 2.0 Extend",
     "requiresRequestId": true,
     "inputs": {
@@ -2183,7 +2194,8 @@ export const t2vModels = [
   },
   {
     "id": "kling-v2.1-master-t2v",
-    "name": "Kling v2.1 Master",
+    "slug": "kling/v2-1-pro",
+    "name": "Kling v2.1 Pro",
     "inputs": {
       "prompt": { "type": "string", "title": "Prompt", "name": "prompt", "description": "Text prompt describing the video." },
       "aspect_ratio": { "enum": ["16:9", "9:16", "1:1"], "title": "Aspect Ratio", "name": "aspect_ratio", "type": "string", "description": "Aspect ratio of the output video.", "default": "16:9" },
@@ -2237,6 +2249,7 @@ export const t2vModels = [
   },
   {
     "id": "veo3-text-to-video",
+    "slug": "veo3",
     "name": "Veo 3",
     "inputs": {
       "prompt": { "type": "string", "title": "Prompt", "name": "prompt", "description": "Text prompt describing the desired video content." },
@@ -2245,6 +2258,7 @@ export const t2vModels = [
   },
   {
     "id": "veo3-fast-text-to-video",
+    "slug": "veo3_fast",
     "name": "Veo 3 Fast",
     "inputs": {
       "prompt": { "type": "string", "title": "Prompt", "name": "prompt", "description": "Text prompt describing the desired video content." },
@@ -2334,7 +2348,8 @@ export const t2vModels = [
   },
   {
     "id": "wan2.6-text-to-video",
-    "name": "Wan 2.6",
+    "slug": "wan/3-0-video",
+    "name": "Wan 3.0",
     "inputs": {
       "prompt": { "type": "string", "title": "Prompt", "name": "prompt", "description": "The prompt to generate the video" },
       "aspect_ratio": { "enum": ["16:9", "9:16"], "title": "Aspect Ratio", "name": "aspect_ratio", "type": "string", "description": "Aspect ratio of the output video.", "default": "16:9" },
@@ -2433,6 +2448,7 @@ export const t2vModels = [
   },
   {
     "id": "openai-sora-2-text-to-video",
+    "slug": "sora-2-text-to-video",
     "name": "Sora 2",
     "inputs": {
       "prompt": { "type": "string", "title": "Prompt", "name": "prompt", "description": "The prompt to generate the video" },
@@ -2442,6 +2458,7 @@ export const t2vModels = [
   },
   {
     "id": "openai-sora-2-pro-text-to-video",
+    "slug": "sora-2-pro-text-to-video",
     "name": "Sora 2 Pro",
     "inputs": {
       "prompt": { "type": "string", "title": "Prompt", "name": "prompt", "description": "The prompt to generate the video" },
@@ -3291,6 +3308,7 @@ export const i2iModels = [
   },
   {
     "id": "qwen-image-edit",
+    "slug": "qwen/image-to-image",
     "name": "Qwen Image Edit",
     "endpoint": "qwen-image-edit",
     "family": "qwen",
@@ -3365,6 +3383,7 @@ export const i2iModels = [
   },
   {
     "id": "nano-banana-edit",
+    "slug": "nano-banana-edit",
     "name": "Nano Banana Edit",
     "endpoint": "nano-banana-edit",
     "family": "nano",
@@ -4052,7 +4071,8 @@ export const i2iModels = [
   },
   {
     "id": "nano-banana-pro-edit",
-    "name": "Nano Banana Pro Edit",
+    "slug": "nano-banana-pro",
+    "name": "Nano Banana Pro",
     "endpoint": "nano-banana-pro-edit",
     "family": "nano",
     "imageField": "images_list",
@@ -4501,7 +4521,8 @@ export const i2iModels = [
   },
   {
     "id": "gpt-image-1.5-edit",
-    "name": "Gpt Image 1.5 Edit",
+    "slug": "gpt-image-2-image-to-image",
+    "name": "GPT Image 2 Edit",
     "endpoint": "gpt-image-1.5-edit",
     "family": "gpt-1.5",
     "imageField": "images_list",
@@ -4702,7 +4723,8 @@ export const i2iModels = [
   },
   {
     "id": "nano-banana-2-edit",
-    "name": "Nano Banana 2 Edit",
+    "slug": "nano-banana-2",
+    "name": "Nano Banana 2",
     "endpoint": "nano-banana-2-edit",
     "family": "nano",
     "imageField": "images_list",
@@ -5134,7 +5156,8 @@ export const i2vModels = [
   },
   {
     "id": "veo3-image-to-video",
-    "name": "Veo3 Image To Video",
+    "slug": "veo3",
+    "name": "Veo 3",
     "endpoint": "veo3-image-to-video",
     "family": "veo",
     "imageField": "images_list",
@@ -5164,7 +5187,8 @@ export const i2vModels = [
   },
   {
     "id": "veo3-fast-image-to-video",
-    "name": "Veo3 Fast Image To Video",
+    "slug": "veo3_fast",
+    "name": "Veo 3 Fast",
     "endpoint": "veo3-fast-image-to-video",
     "family": "veo",
     "imageField": "images_list",
@@ -5475,7 +5499,8 @@ export const i2vModels = [
   },
   {
     "id": "kling-v2.1-standard-i2v",
-    "name": "Kling v2.1 Standard I2V",
+    "slug": "kling/v2-1-standard",
+    "name": "Kling v2.1 Standard",
     "endpoint": "kling-v2.1-standard-i2v",
     "family": "kling-v2.1",
     "imageField": "image_url",
@@ -5516,7 +5541,8 @@ export const i2vModels = [
   },
   {
     "id": "kling-v2.1-pro-i2v",
-    "name": "Kling v2.1 Pro I2V",
+    "slug": "kling/v2-1-pro",
+    "name": "Kling v2.1 Pro",
     "endpoint": "kling-v2.1-pro-i2v",
     "family": "kling-v2.1",
     "imageField": "image_url",
@@ -5923,7 +5949,8 @@ export const i2vModels = [
   },
   {
     "id": "seedance-lite-i2v",
-    "name": "Seedance Lite I2V",
+    "slug": "bytedance/seedance-2-fast",
+    "name": "Seedance 2 Fast",
     "endpoint": "seedance-lite-i2v",
     "family": "bytedance",
     "imageField": "image_url",
@@ -6276,10 +6303,12 @@ export const i2vModels = [
   },
   {
     "id": "openai-sora-2-image-to-video",
-    "name": "Openai Sora 2 Image To Video",
+    "slug": "sora-2-image-to-video",
+    "name": "Sora 2",
     "endpoint": "openai-sora-2-image-to-video",
     "family": "sora",
-    "imageField": "images_list",
+    "imageField": "image_urls",
+    "imageFieldType": "array",
     "hasPrompt": true,
     "inputs": {
       "prompt": {
@@ -6343,10 +6372,12 @@ export const i2vModels = [
   },
   {
     "id": "openai-sora-2-pro-image-to-video",
-    "name": "Openai Sora 2 Pro Image To Video",
+    "slug": "sora-2-pro-image-to-video",
+    "name": "Sora 2 Pro",
     "endpoint": "openai-sora-2-pro-image-to-video",
     "family": "sora",
-    "imageField": "images_list",
+    "imageField": "image_urls",
+    "imageFieldType": "array",
     "hasPrompt": true,
     "inputs": {
       "prompt": {
@@ -7504,7 +7535,8 @@ export const i2vModels = [
   },
   {
     "id": "wan2.6-image-to-video",
-    "name": "Wan2.6 Image To Video",
+    "slug": "wan/3-0-video",
+    "name": "Wan 3.0",
     "endpoint": "wan2.6-image-to-video",
     "family": "wan2.6",
     "imageField": "image_url",
@@ -7629,7 +7661,8 @@ export const i2vModels = [
   },
   {
     "id": "seedance-v1.5-pro-i2v",
-    "name": "Seedance v1.5 Pro I2V",
+    "slug": "bytedance/seedance-1.5-pro",
+    "name": "Seedance v1.5 Pro",
     "endpoint": "seedance-v1.5-pro-i2v",
     "family": "seedance-v1.5-pro",
     "imageField": "image_url",
@@ -7881,7 +7914,8 @@ export const i2vModels = [
   },
   {
     "id": "seedance-v2.0-i2v",
-    "name": "Seedance 2.0 I2V",
+    "slug": "bytedance/seedance-2",
+    "name": "Seedance 2.0",
     "endpoint": "seedance-v2.0-i2v",
     "family": "seedance-v2.0",
     "imageField": "images_list",
@@ -8014,7 +8048,8 @@ export const getMaxImagesForI2IModel = (modelId) => {
 export const v2vModels = [
   {
     "id": "video-watermark-remover",
-    "name": "AI Video Watermark Remover",
+    "slug": "sora-watermark-remover",
+    "name": "Sora Watermark Remover",
     "endpoint": "video-watermark-remover",
     "family": "tools",
     "videoField": "video_url",
@@ -8029,38 +8064,53 @@ export const v2vModels = [
 export const lipsyncModels = [
   // ── Image + Audio → Video ──────────────────────────────────────────────────
   {
-    "id": "infinitetalk-image-to-video",
-    "name": "Infinite Talk",
-    "endpoint": "infinitetalk-image-to-video",
-    "family": "infinitetalk",
+    "id": "omnihuman-1-5",
+    "name": "OmniHuman 1.5",
+    "endpoint": "omnihuman-1-5",
+    "slug": "omnihuman-1-5",
+    "family": "omnihuman",
     "category": "image",
     "hasPrompt": true,
+    "hasSeed": true,
+    "imageField": "image_url",
+    "imageFieldType": "string",
+    "audioField": "audio_url",
+    "audioFieldType": "string",
+    "resolutionField": "output_resolution",
+    "maxImages": 1,
     "description": "Animate a portrait image into a talking video driven by audio.",
     "inputs": {
       "resolution": {
         "type": "string",
         "title": "Resolution",
         "name": "resolution",
-        "enum": ["480p", "720p"],
-        "default": "480p"
+        "enum": ["720p", "1080p"],
+        "default": "1080p"
       }
     }
   },
   {
     "id": "wan2.2-speech-to-video",
+    "slug": "wan/2-2-a14b-speech-to-video-turbo",
     "name": "Wan 2.2 Speech to Video",
     "endpoint": "wan2.2-speech-to-video",
     "family": "wan",
     "category": "image",
     "hasPrompt": true,
+    "requiresPrompt": true,
+    "imageField": "image_url",
+    "imageFieldType": "string",
+    "audioField": "audio_url",
+    "audioFieldType": "string",
+    "maxImages": 1,
     "description": "Generate a talking portrait video from an image and audio using Wan 2.2.",
     "inputs": {
       "resolution": {
         "type": "string",
         "title": "Resolution",
         "name": "resolution",
-        "enum": ["480p", "720p"],
-        "default": "480p"
+        "enum": ["480p", "580p", "720p"],
+        "default": "720p"
       }
     }
   },
@@ -8078,7 +8128,7 @@ export const lipsyncModels = [
         "type": "string",
         "title": "Resolution",
         "name": "resolution",
-        "enum": ["480p", "720p", "1080p"],
+        "enum": ["720p", "1080p"],
         "default": "720p"
       }
     }
@@ -8096,20 +8146,26 @@ export const lipsyncModels = [
         "type": "string",
         "title": "Resolution",
         "name": "resolution",
-        "enum": ["480p", "720p", "1080p"],
+        "enum": ["720p", "1080p"],
         "default": "720p"
       }
     }
   },
   // ── Video + Audio → Video ──────────────────────────────────────────────────
   {
-    "id": "sync-lipsync",
-    "name": "Sync Lipsync",
-    "endpoint": "sync-lipsync",
-    "family": "lipsync",
+    "id": "volcengine-video-to-video-lip-sync",
+    "name": "Volcengine Video Lip Sync",
+    "endpoint": "volcengine/video-to-video-lip-sync",
+    "slug": "volcengine/video-to-video-lip-sync",
+    "family": "volcengine",
     "category": "video",
     "hasPrompt": false,
-    "description": "Generate realistic lipsync animations from audio using Sync's advanced algorithms."
+    "videoField": "video_url",
+    "videoFieldType": "string",
+    "audioField": "audio_url",
+    "audioFieldType": "string",
+    "defaults": { "mode": "basic" },
+    "description": "Drive the lips in an existing video to match an audio track."
   },
   {
     "id": "latent-sync",
@@ -8151,12 +8207,55 @@ export const lipsyncModels = [
         "type": "string",
         "title": "Resolution",
         "name": "resolution",
-        "enum": ["480p", "720p"],
-        "default": "480p"
+        "enum": ["720p", "1080p"],
+        "default": "720p"
       }
     }
   }
 ];
+
+const LEGACY_KIE_SLUGS = new Set([
+  'sora-2-text-to-video',
+  'sora-2-pro-text-to-video',
+  'sora-2-image-to-video',
+  'sora-2-pro-image-to-video',
+  'veo3',
+  'veo3_fast',
+  'bytedance/seedance-1.5-pro',
+]);
+
+// The Kie catalog is authoritative for anything it lists. Keep only the few
+// legacy routes that still work but are not in the current catalog.
+const replaceWithKieCatalog = (models, catalog) => {
+  const out = [...catalog];
+  const seen = new Set(out.map((m) => m.slug));
+  for (const model of models) {
+    if (model.id === 'seedance-v2.0-extend') {
+      out.push(model);
+      continue;
+    }
+    if (!model.slug || !LEGACY_KIE_SLUGS.has(model.slug) || seen.has(model.slug)) continue;
+    out.push(model);
+    seen.add(model.slug);
+  }
+  models.splice(0, models.length, ...out);
+};
+
+const appendKieCatalog = (models, catalog) => {
+  const seen = new Set(models.map((m) => m.slug).filter(Boolean));
+  for (const model of catalog) {
+    if (seen.has(model.slug)) continue;
+    models.push(model);
+    seen.add(model.slug);
+  }
+};
+
+replaceWithKieCatalog(t2iModels, kieT2I);
+replaceWithKieCatalog(i2iModels, kieI2I);
+replaceWithKieCatalog(t2vModels, kieT2V);
+replaceWithKieCatalog(i2vModels, kieI2V);
+appendKieCatalog(v2vModels, kieV2V);
+appendKieCatalog(lipsyncModels, kieLipSync);
 
 export const getLipSyncModelById = (id) => lipsyncModels.find(m => m.id === id);
 
@@ -8165,7 +8264,18 @@ export const getResolutionsForLipSyncModel = (id) => {
   return model?.inputs?.resolution?.enum || [];
 };
 
-export const imageLipSyncModels = lipsyncModels.filter(m => m.category === 'image');
-export const videoLipSyncModels = lipsyncModels.filter(m => m.category === 'video');
+export const imageLipSyncModels = lipsyncModels.filter(m => m.category === 'image' && m.slug);
+export const videoLipSyncModels = lipsyncModels.filter(m => m.category === 'video' && m.slug);
+
+// Only models we can actually call on Kie should appear in pickers.
+export const selectableT2IModels = t2iModels.filter(m => m.slug);
+export const selectableI2IModels = i2iModels.filter(m => m.slug);
+export const selectableT2VModels = t2vModels.filter(m => m.slug && !m.hidden);
+export const selectableI2VModels = i2vModels.filter(m => m.slug && !m.hidden);
+export const selectableV2VModels = v2vModels.filter(m => m.slug && !m.hidden);
+
+export const findModelById = (id) =>
+  [...t2iModels, ...i2iModels, ...t2vModels, ...i2vModels, ...v2vModels, ...lipsyncModels]
+    .find(m => m.id === id);
 
 export const getV2VModelById = (id) => v2vModels.find(m => m.id === id);
