@@ -541,8 +541,10 @@ export default function CinemaStudio({ apiKey, onGenerationComplete, historyItem
     const handleDownload = useCallback(async () => {
         if (!canvasUrl) return;
         try {
-            const response = await fetch(canvasUrl);
+            const response = await fetch(canvasUrl, { referrerPolicy: 'no-referrer' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const blob = await response.blob();
+            if (blob.size < 1024) throw new Error(`suspiciously small file (${blob.size} bytes)`);
             const blobUrl = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = blobUrl;
@@ -551,7 +553,8 @@ export default function CinemaStudio({ apiKey, onGenerationComplete, historyItem
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(blobUrl);
-        } catch {
+        } catch (err) {
+            console.error('[download]', err.message);
             window.open(canvasUrl, '_blank');
         }
     }, [canvasUrl]);
@@ -618,6 +621,7 @@ export default function CinemaStudio({ apiKey, onGenerationComplete, historyItem
                             ref={resultImgRef}
                             src={canvasUrl}
                             alt="Generated cinema shot"
+                            referrerPolicy="no-referrer"
                             className="max-h-[60vh] max-w-[90vw] rounded-2xl shadow-2xl border border-white/10 object-contain"
                         />
                     )}
@@ -760,6 +764,7 @@ export default function CinemaStudio({ apiKey, onGenerationComplete, historyItem
                             <img
                                 src={entry.url}
                                 alt={`History item ${idx + 1}`}
+                                referrerPolicy="no-referrer"
                                 className="w-full h-full object-cover opacity-80 group-hover/thumb:opacity-100 transition-opacity"
                             />
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">

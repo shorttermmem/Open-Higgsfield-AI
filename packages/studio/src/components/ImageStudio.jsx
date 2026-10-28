@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { generateImage, generateI2I, uploadFile } from "../kie.js";
 import {
-  t2iModels,
-  i2iModels,
+  selectableT2IModels as t2iModels,
+  selectableI2IModels as i2iModels,
   getAspectRatiosForModel,
   getResolutionsForModel,
   getQualityFieldForModel,
@@ -19,8 +19,10 @@ import {
 
 async function downloadImage(url, filename) {
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { referrerPolicy: 'no-referrer' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const blob = await response.blob();
+    if (blob.size < 1024) throw new Error(`suspiciously small file (${blob.size} bytes)`);
     const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = blobUrl;
@@ -29,7 +31,8 @@ async function downloadImage(url, filename) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(blobUrl);
-  } catch {
+  } catch (err) {
+    console.error("[download]", err.message);
     window.open(url, "_blank");
   }
 }
@@ -409,6 +412,7 @@ function UploadButton({ apiKey, maxImages, onSelect, onClear }) {
                       <img
                         src={entry.url}
                         alt={entry.name}
+                        referrerPolicy="no-referrer"
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -850,6 +854,7 @@ export default function ImageStudio({ apiKey, onGenerationComplete, historyItems
                     <img
                       src={entry.url}
                       alt={entry.prompt?.substring(0, 30) || "Generated"}
+                      referrerPolicy="no-referrer"
                       className="w-full aspect-square object-cover"
                     />
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center gap-1">
@@ -878,6 +883,7 @@ export default function ImageStudio({ apiKey, onGenerationComplete, historyItems
             <img
               src={currentImageUrl}
               alt={history[activeHistoryIdx]?.prompt || "Generated image"}
+              referrerPolicy="no-referrer"
               className="max-h-[60vh] max-w-[80vw] rounded-3xl shadow-3xl border border-white/10 interactive-glow object-contain"
             />
           </div>

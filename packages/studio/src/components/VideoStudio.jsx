@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { generateVideo, generateI2V, uploadFile } from '../kie.js';
 import {
-    t2vModels,
-    i2vModels,
-    v2vModels,
+    selectableT2VModels as t2vModels,
+    selectableI2VModels as i2vModels,
+    selectableV2VModels as v2vModels,
     getAspectRatiosForVideoModel,
     getDurationsForModel,
     getResolutionsForVideoModel,
@@ -13,7 +13,9 @@ import {
     getDurationsForI2VModel,
     getResolutionsForI2VModel,
     getModesForModel,
+    findModelById,
 } from '../models.js';
+import { mediaUrl } from '../media.js';
 
 // ── tiny helpers ──────────────────────────────────────────────────────────────
 
@@ -24,8 +26,10 @@ function getQualitiesForModel(modelList, modelId) {
 
 async function downloadFile(url, filename) {
     try {
-        const response = await fetch(url);
+        const response = await fetch(mediaUrl(url));
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const blob = await response.blob();
+        if (blob.size < 1024) throw new Error(`suspiciously small file (${blob.size} bytes)`);
         const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = blobUrl;
@@ -34,8 +38,9 @@ async function downloadFile(url, filename) {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(blobUrl);
-    } catch {
-        window.open(url, '_blank');
+    } catch (err) {
+        console.error('[download]', err.message);
+        window.open(mediaUrl(url), '_blank');
     }
 }
 
@@ -259,8 +264,8 @@ export default function VideoStudio({ apiKey, onGenerationComplete, historyItems
         [imageMode]);
 
     const getCurrentModel = useCallback(() =>
-        getCurrentModels().find(m => m.id === selectedModel),
-        [getCurrentModels, selectedModel]);
+        findModelById(selectedModel),
+        [selectedModel]);
 
     // ── update controls when model/mode changes ──────────────────────────────
     const applyControlsForModel = useCallback((modelId, isImageMode, isV2vMode) => {
@@ -400,7 +405,7 @@ export default function VideoStudio({ apiKey, onGenerationComplete, historyItems
             setSelectedModelName(firstV2V.name);
             applyControlsForModel(firstV2V.id, false, true);
             setPrompt('');
-            setPromptDisabled(true);
+            setPromptDisabled(!firstV2V.hasPrompt);
         } catch (err) {
             console.error('[VideoStudio] Video upload failed:', err);
             alert(`Video upload failed: ${err.message}`);
@@ -433,7 +438,7 @@ export default function VideoStudio({ apiKey, onGenerationComplete, historyItems
             setSelectedModelName(m.name);
             applyControlsForModel(m.id, false, true);
             setPrompt('');
-            setPromptDisabled(true);
+            setPromptDisabled(!m.hasPrompt);
         } else {
             if (v2vMode) {
                 setV2vMode(false);
@@ -486,19 +491,21 @@ export default function VideoStudio({ apiKey, onGenerationComplete, historyItems
 
             if (v2vMode) {
                 // V2V: use generateVideo with video_url (the v2v models use the video endpoint)
-                res = await generateVideo(apiKey, {
+                const v2vParams = {
                     model: selectedModel,
                     video_url: uploadedVideoUrl,
-                });
+                };
+                if (currentModel?.hasPrompt && trimmedPrompt) v2vParams.prompt = trimmedPrompt;
+                res = await generateVideo(apiKey, v2vParams);
                 if (!res?.url) throw new Error('No video URL returned by API');
 
                 const genId = res.id || Date.now().toString();
                 setLastGenerationId(null);
                 setLastGenerationModel(null);
-                const entry = { id: genId, url: res.url, prompt: '', model: selectedModel, timestamp: new Date().toISOString() };
+                const entry = { id: genId, url: res.url, prompt: trimmedPrompt, model: selectedModel, timestamp: new Date().toISOString() };
                 addToLocalHistory(entry);
                 showVideoInCanvas(res.url, selectedModel);
-                if (onGenerationComplete) onGenerationComplete({ url: res.url, model: selectedModel, prompt: '', type: 'video' });
+                if (onGenerationComplete) onGenerationComplete({ url: res.url, model: selectedModel, prompt: trimmedPrompt, type: 'video' });
 
             } else if (imageMode) {
                 const i2vParams = { model: selectedModel, image_url: uploadedImageUrl };
@@ -617,7 +624,7 @@ export default function VideoStudio({ apiKey, onGenerationComplete, historyItems
     const isExtendMode = currentModelObj?.requiresRequestId;
 
     const promptPlaceholder = v2vMode
-        ? 'Video ready — click Generate to remove watermark'
+        ? (currentModelObj?.hasPrompt ? 'Describe the edit or motion (optional)' : 'Video ready — click Generate to remove watermark')
         : imageMode
             ? 'Describe the motion or effect (optional)'
             : isExtendMode
@@ -660,7 +667,7 @@ export default function VideoStudio({ apiKey, onGenerationComplete, historyItems
                                     showVideoInCanvas(entry.url, entry.model);
                                 }}
                             >
-                                <video src={entry.url} preload="metadata" muted className="w-full aspect-square object-cover" />
+                                <video src={mediaUrl(entry.url)} preload="metadata" muted className="w-full aspect-square object-cover" />
                                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center gap-1">
                                     <button className="hist-download p-1.5 bg-primary rounded-lg text-black hover:scale-110 transition-transform" title="Download">
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
@@ -681,13 +688,14 @@ export default function VideoStudio({ apiKey, onGenerationComplete, historyItems
                         <video
                             ref={resultVideoRef}
                             key={canvasUrl}
-                            src={canvasUrl}
+                            src={mediaUrl(canvasUrl)}
                             className="max-h-[60vh] max-w-[80vw] rounded-3xl shadow-3xl border border-white/10 interactive-glow object-contain"
                             controls
                             loop
                             autoPlay
                             muted
                             playsInline
+                            referrerPolicy="no-referrer"
                         />
                     </div>
                     <div className="mt-6 flex gap-3 justify-center">

@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { processLipSync, uploadFile } from '../kie.js';
+import { blobToAudioFile } from '../fishaudio.js';
+import VoicePicker from './VoicePicker.jsx';
+import { mediaUrl } from '../media.js';
 import {
     lipsyncModels,
     imageLipSyncModels,
@@ -107,6 +111,9 @@ function MediaPickerButton({ accept, label, icon, onUpload, onClear, uploadState
 function Dropdown({ isOpen, items, selectedId, onSelect, onClose, anchorRef }) {
     const dropRef = useRef(null);
     const [style, setStyle] = useState({});
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => { setMounted(true); }, []);
 
     useEffect(() => {
         if (!isOpen || !anchorRef?.current || !dropRef.current) return;
@@ -141,12 +148,22 @@ function Dropdown({ isOpen, items, selectedId, onSelect, onClose, anchorRef }) {
         return () => window.removeEventListener('click', handler);
     }, [isOpen, onClose, anchorRef]);
 
-    if (!isOpen) return null;
+    if (!isOpen || !mounted) return null;
 
-    return (
+    const positioned = style.top !== undefined || style.bottom !== undefined;
+
+    return createPortal(
         <div
             ref={dropRef}
-            style={{ position: 'fixed', zIndex: 100, minWidth: 200, overflowY: 'auto', ...style }}
+            style={{
+                position: 'fixed',
+                zIndex: 100,
+                minWidth: 200,
+                maxWidth: 'min(320px, calc(100vw - 16px))',
+                overflowY: 'auto',
+                visibility: positioned ? 'visible' : 'hidden',
+                ...style,
+            }}
             className="bg-[#111] border border-white/10 rounded-2xl shadow-3xl p-2 custom-scrollbar"
         >
             {items.map((item) => (
@@ -166,7 +183,8 @@ function Dropdown({ isOpen, items, selectedId, onSelect, onClose, anchorRef }) {
                     )}
                 </button>
             ))}
-        </div>
+        </div>,
+        document.body
     );
 }
 
@@ -181,7 +199,7 @@ function HistoryThumb({ entry, isActive, onSelect, onDownload }) {
                 isActive ? 'border-primary shadow-glow' : 'border-white/10 hover:border-white/30'
             }`}
         >
-            <video src={entry.url} preload="metadata" muted className="w-full aspect-square object-cover" />
+            <video src={mediaUrl(entry.url)} preload="metadata" muted className="w-full aspect-square object-cover" />
             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
                 <button
                     type="button"
@@ -219,7 +237,7 @@ const VideoIcon = ({ className = 'text-muted group-hover:text-primary transition
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function LipSyncStudio({ apiKey, onGenerationComplete, historyItems }) {
+export default function LipSyncStudio({ apiKey, fishKey, onGenerationComplete, historyItems }) {
     // ── Mode & model state ──────────────────────────────────────────────────
     const [inputMode, setInputMode] = useState('image'); // 'image' | 'video'
 
@@ -228,13 +246,14 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
 
     const [selectedModelId, setSelectedModelId] = useState(firstModel?.id ?? '');
     const [selectedResolution, setSelectedResolution] = useState(
-        firstModel?.inputs?.resolution?.default ?? '480p'
+        firstModel?.inputs?.resolution?.default ?? '720p'
     );
 
     // ── Upload state ────────────────────────────────────────────────────────
     const [imageState, setImageState] = useState(UPLOAD_STATE.IDLE);
     const [imageName, setImageName] = useState('');
     const [imageUrl, setImageUrl] = useState(null);
+    const [imageDimensions, setImageDimensions] = useState(null);
 
     const [videoState, setVideoState] = useState(UPLOAD_STATE.IDLE);
     const [videoName, setVideoName] = useState('');
@@ -243,6 +262,8 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
     const [audioState, setAudioState] = useState(UPLOAD_STATE.IDLE);
     const [audioName, setAudioName] = useState('');
     const [audioUrl, setAudioUrl] = useState(null);
+    const [audioDuration, setAudioDuration] = useState(null);
+    const [voicePickerOpen, setVoicePickerOpen] = useState(false);
 
     // ── Individual progress states ──
     const [imageProgress, setImageProgress] = useState(0);
@@ -284,7 +305,7 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
         const first = models[0];
         if (!first) return;
         setSelectedModelId(first.id);
-        setSelectedResolution(first.inputs?.resolution?.default ?? '480p');
+        setSelectedResolution(first.inputs?.resolution?.default ?? '720p');
     }, [inputMode]);
 
     // ── Upload handlers ─────────────────────────────────────────────────────
@@ -293,6 +314,19 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
             alert("Image exceeds 10MB limit.");
             return;
         }
+        // Read dimensions locally so we can warn before a paid generation.
+        const objectUrl = URL.createObjectURL(file);
+        const probe = new Image();
+        probe.onload = () => {
+            setImageDimensions({ width: probe.naturalWidth, height: probe.naturalHeight });
+            URL.revokeObjectURL(objectUrl);
+        };
+        probe.onerror = () => {
+            setImageDimensions(null);
+            URL.revokeObjectURL(objectUrl);
+        };
+        probe.src = objectUrl;
+
         setImageState(UPLOAD_STATE.UPLOADING);
         setImageProgress(0);
         try {
@@ -337,6 +371,18 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
             alert("Audio file exceeds 10MB limit.");
             return;
         }
+        const objectUrl = URL.createObjectURL(file);
+        const probe = new Audio();
+        probe.onloadedmetadata = () => {
+            setAudioDuration(Number.isFinite(probe.duration) ? probe.duration : null);
+            URL.revokeObjectURL(objectUrl);
+        };
+        probe.onerror = () => {
+            setAudioDuration(null);
+            URL.revokeObjectURL(objectUrl);
+        };
+        probe.src = objectUrl;
+
         setAudioState(UPLOAD_STATE.UPLOADING);
         setAudioProgress(0);
         try {
@@ -349,6 +395,41 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
         } catch (err) {
             setAudioState(UPLOAD_STATE.IDLE);
             alert(`Audio upload failed: ${err.message}`);
+        } finally {
+            setAudioProgress(0);
+        }
+    }, [apiKey]);
+
+    // Fish Audio voice -> upload the generated clip so lip-sync models get a URL.
+    // Throws on failure so the picker can stay open and show the error.
+    const handleVoiceAudio = useCallback(async (blob, meta) => {
+        try {
+            const probeUrl = URL.createObjectURL(blob);
+            const probe = new Audio();
+            probe.onloadedmetadata = () => {
+                setAudioDuration(Number.isFinite(probe.duration) ? probe.duration : null);
+                URL.revokeObjectURL(probeUrl);
+            };
+            probe.onerror = () => {
+                setAudioDuration(null);
+                URL.revokeObjectURL(probeUrl);
+            };
+            probe.src = probeUrl;
+        } catch {
+            setAudioDuration(null);
+        }
+        setAudioState(UPLOAD_STATE.UPLOADING);
+        setAudioProgress(0);
+        try {
+            const file = blobToAudioFile(blob, `fish-voice-${Date.now()}.mp3`);
+            const url = await uploadFile(apiKey, file, (pct) => setAudioProgress(pct));
+            setAudioUrl(url);
+            setAudioName(meta?.voice ? `AI voice — ${meta.voice}.mp3` : 'AI voice.mp3');
+            setAudioState(UPLOAD_STATE.READY);
+            return true;
+        } catch (err) {
+            setAudioState(UPLOAD_STATE.IDLE);
+            throw new Error(`Voice upload failed: ${err.message}`);
         } finally {
             setAudioProgress(0);
         }
@@ -367,6 +448,7 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
         if (inputMode === 'video') return;
         setInputMode('video');
         setImageUrl(null);
+        setImageDimensions(null);
         setImageState(UPLOAD_STATE.IDLE);
         setImageName('');
     };
@@ -387,8 +469,10 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
 
     const downloadFile = async (url, filename) => {
         try {
-            const response = await fetch(url);
+            const response = await fetch(mediaUrl(url));
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const blob = await response.blob();
+            if (blob.size < 1024) throw new Error(`suspiciously small file (${blob.size} bytes)`);
             const blobUrl = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = blobUrl;
@@ -397,8 +481,9 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(blobUrl);
-        } catch {
-            window.open(url, '_blank');
+        } catch (err) {
+            console.error('[download]', err.message);
+            window.open(mediaUrl(url), '_blank');
         }
     };
 
@@ -458,9 +543,9 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
         setView('input');
         setActiveResultUrl(null);
         setPrompt('');
-        setImageUrl(null); setImageState(UPLOAD_STATE.IDLE); setImageName('');
+        setImageUrl(null); setImageDimensions(null); setImageState(UPLOAD_STATE.IDLE); setImageName('');
         setVideoUrl(null); setVideoState(UPLOAD_STATE.IDLE); setVideoName('');
-        setAudioUrl(null); setAudioState(UPLOAD_STATE.IDLE); setAudioName('');
+        setAudioUrl(null); setAudioDuration(null); setAudioState(UPLOAD_STATE.IDLE); setAudioName('');
     };
 
     // ── Media status labels ─────────────────────────────────────────────────
@@ -585,9 +670,10 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
                                         }
                                         onUpload={handleImageUpload}
                                         onClear={() => { 
-                                            setImageUrl(null); 
-                                            setImageState(UPLOAD_STATE.IDLE); 
-                                            setImageName(''); 
+                                            setImageUrl(null);
+                                            setImageDimensions(null);
+                                            setImageState(UPLOAD_STATE.IDLE);
+                                            setImageName('');
                                         }}
                                         uploadState={imageState}
                                         progress={imageProgress}
@@ -625,7 +711,7 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
                                     label="Audio"
                                     icon={<MicIcon />}
                                     onUpload={handleAudioPick}
-                                    onClear={() => { setAudioUrl(null); setAudioState(UPLOAD_STATE.IDLE); setAudioName(''); }}
+                                    onClear={() => { setAudioUrl(null); setAudioDuration(null); setAudioState(UPLOAD_STATE.IDLE); setAudioName(''); }}
                                     uploadState={audioState}
                                     progress={audioProgress}
                                     fileName={audioName}
@@ -633,6 +719,23 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
                                     isVideo={false}
                                     apiKey={apiKey}
                                 />
+
+                                {/* AI voice — Fish Audio (only when a Fish key is set) */}
+                                {fishKey && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); setVoicePickerOpen(true); }}
+                                        title="Generate the voice line with Fish Audio"
+                                        className="flex-shrink-0 h-14 px-3 rounded-xl border border-primary/40 bg-primary/10 hover:bg-primary/20 transition-all flex flex-col items-center justify-center gap-1 group"
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary">
+                                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                                            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                                            <line x1="12" y1="19" x2="12" y2="23" />
+                                        </svg>
+                                        <span className="text-[9px] font-black text-primary uppercase tracking-wide">AI Voice</span>
+                                    </button>
+                                )}
 
                                 {/* Prompt textarea */}
                                 {showPrompt && (
@@ -652,6 +755,24 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
                                 <span>·</span>
                                 <span className={audioStatusClass}>{audioStatusText}</span>
                             </div>
+
+                            {inputMode === 'image' && selectedModel?.slug === 'omnihuman-1-5' && audioState === UPLOAD_STATE.READY && audioDuration > 15 && (
+                                <div className="mx-2 px-3 py-2 rounded-xl border border-orange-400/20 bg-orange-400/5 text-[11px] leading-relaxed text-orange-200/80">
+                                    Audio is {Math.round(audioDuration)}s. OmniHuman 1.5 degrades past ~15s — split the audio into shorter clips and stitch the results for best quality.
+                                </div>
+                            )}
+
+                            {inputMode === 'image' && imageState === UPLOAD_STATE.READY && imageDimensions && Math.min(imageDimensions.width, imageDimensions.height) < 720 && (
+                                <div className="mx-2 px-3 py-2 rounded-xl border border-yellow-400/20 bg-yellow-400/5 text-[11px] leading-relaxed text-yellow-200/80">
+                                    Low-resolution source ({imageDimensions.width}×{imageDimensions.height}). The model upscales it, so the output will stay soft. Use a clear portrait with at least a 1024px short side for sharper results.
+                                </div>
+                            )}
+
+                            {inputMode === 'image' && imageState === UPLOAD_STATE.READY && (
+                                <div className="px-2 text-[10px] leading-relaxed text-muted/60">
+                                    OmniHuman animates the upper body — a waist-up shot with hands visible usually avoids invented hand gestures.
+                                </div>
+                            )}
 
                             {/* Bottom controls row */}
                             <div className="flex items-center gap-2 md:gap-3 flex-wrap px-2">
@@ -745,12 +866,13 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
                     <div className="relative group">
                         <video
                             ref={resultVideoRef}
-                            src={activeResultUrl}
+                            src={mediaUrl(activeResultUrl)}
                             className="max-h-[60vh] max-w-[80vw] rounded-3xl shadow-3xl border border-white/10 interactive-glow object-contain"
                             controls
                             loop
                             autoPlay
                             playsInline
+                            referrerPolicy="no-referrer"
                         />
                     </div>
                     <div className="mt-6 flex gap-3 justify-center">
@@ -781,6 +903,15 @@ export default function LipSyncStudio({ apiKey, onGenerationComplete, historyIte
                         </button>
                     </div>
                 </div>
+            )}
+
+            {/* Fish Audio voice picker */}
+            {voicePickerOpen && fishKey && (
+                <VoicePicker
+                    fishKey={fishKey}
+                    onClose={() => setVoicePickerOpen(false)}
+                    onAudio={handleVoiceAudio}
+                />
             )}
         </div>
     );

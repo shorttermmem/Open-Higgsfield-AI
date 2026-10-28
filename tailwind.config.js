@@ -11,8 +11,8 @@ module.exports = {
         extend: {
             colors: {
                 primary: {
-                    DEFAULT: '#ff2d2d',
-                    hover: '#e11d1d',
+                    DEFAULT: '#d9ff00',
+                    hover: '#c2e600',
                 },
                 'app-bg': '#050505',
                 'panel-bg': '#0a0a0a',
@@ -29,9 +29,12 @@ module.exports = {
                 '3xl': '2rem',
             },
             boxShadow: {
-                'glow': '0 0 20px rgba(255, 45, 45, 0.4)',
+                'glow': '0 0 20px rgba(217, 255, 0, 0.4)',
+                'glow-sm': '0 0 10px rgba(217, 255, 0, 0.3)',
+                'primary': '0 0 20px rgba(217, 255, 0, 0.35)',
                 'glow-accent': '0 0 20px rgba(168, 85, 247, 0.4)',
                 '3xl': '0 35px 60px -15px rgba(0, 0, 0, 0.8)',
+                '4xl': '0 45px 90px -20px rgba(0, 0, 0, 0.9)',
             }
         },
     },
